@@ -319,7 +319,7 @@ export async function POST(req: NextRequest) {
     const dateStr = fmtDate(today).split('-').reverse().join('.')
     const outputFileName = `KRD_dluznicy_${dateStr}.csv`
 
-    return new NextResponse(encoded, {
+    return new NextResponse(new Uint8Array(encoded), {
       status: 200,
       headers: {
         'Content-Type': 'text/csv; charset=windows-1250',
