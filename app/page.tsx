@@ -57,6 +57,7 @@ export default function Home() {
   const [dluznicy, setDluznicy] = useState<FileState>(null)
   const [adresy, setAdresy] = useState<FileState>(null)
   const [staryKrd, setStaryKrd] = useState<FileState>(null)
+  const [fakturowanie, setFakturowanie] = useState<FileState>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [message, setMessage] = useState('')
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
@@ -77,6 +78,7 @@ export default function Home() {
     form.append('dluznicy', dluznicy)
     form.append('adresy', adresy)
     if (staryKrd) form.append('staryKrd', staryKrd)
+    if (fakturowanie) form.append('fakturowanie', fakturowanie)
 
     try {
       const res = await fetch('/api/generate', { method: 'POST', body: form })
@@ -132,6 +134,14 @@ export default function Home() {
           value={staryKrd}
           onChange={setStaryKrd}
         />
+        <FileZone
+          label="Raport fakturowania (wytwórcy)"
+          hint="Fakturowanie*.xlsx — wytwórcy z kolumny NIP (K) zostaną wykluczeni z listy KRD"
+          accept=".xlsx"
+          required={false}
+          value={fakturowanie}
+          onChange={setFakturowanie}
+        />
       </div>
 
       <button
@@ -174,6 +184,7 @@ export default function Home() {
           <li>Tylko faktury z terminem wymagalności ≥ 47 dni temu</li>
           <li>Klienci z łącznym zadłużeniem &lt; 500 PLN są pomijani</li>
           <li>Daty wysłania wezwań: z poprzedniego KRD lub termin + 7 dni</li>
+          <li>Wytwórcy (raport fakturowania) są wykluczani z listy</li>
           <li>Kodowanie: CP1250, separator: średnik</li>
         </ul>
       </div>

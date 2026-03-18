@@ -248,6 +248,27 @@ function buildCsvRows(
 }
 
 // ---------------------------------------------------------------------------
+// Build producer (wytwórca) NIP set to exclude from KRD
+// ---------------------------------------------------------------------------
+function buildProducerSet(buffer: Buffer): Set<string> {
+  const wb = XLSX.read(buffer, { type: 'buffer', cellDates: true })
+  const nips = new Set<string>()
+
+  for (const sheetName of wb.SheetNames) {
+    const ws = wb.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json<Row>(ws, { header: 1, defval: null, raw: true })
+    for (let i = 1; i < rows.length; i++) {
+      const nipRaw = rows[i][10] // col K (index 10)
+      if (!nipRaw || String(nipRaw).trim() === '' || String(nipRaw) === '#N/A') continue
+      try {
+        nips.add(String(Math.round(Number(nipRaw))))
+      } catch { /* skip */ }
+    }
+  }
+  return nips
+}
+
+// ---------------------------------------------------------------------------
 // Filter clients below MIN_DEBT threshold
 // ---------------------------------------------------------------------------
 function filterByMinDebt(rows: string[]): string[] {
@@ -294,23 +315,30 @@ export async function POST(req: NextRequest) {
   const dluznicyFile = formData.get('dluznicy') as File | null
   const adresyFile = formData.get('adresy') as File | null
   const staryKrdFile = formData.get('staryKrd') as File | null
+  const fakturowanieFile = formData.get('fakturowanie') as File | null
 
   if (!dluznicyFile || !adresyFile) {
     return NextResponse.json({ error: 'Brakuje wymaganych plików' }, { status: 400 })
   }
 
   try {
-    const [dluznicyBuf, adresyBuf, staryKrdBuf] = await Promise.all([
+    const [dluznicyBuf, adresyBuf, staryKrdBuf, fakturowanieBuf] = await Promise.all([
       dluznicyFile.arrayBuffer().then(Buffer.from),
       adresyFile.arrayBuffer().then(Buffer.from),
       staryKrdFile ? staryKrdFile.arrayBuffer().then(Buffer.from) : Promise.resolve(null),
+      fakturowanieFile ? fakturowanieFile.arrayBuffer().then(Buffer.from) : Promise.resolve(null),
     ])
 
     const addressMap = buildAddressLookup(adresyBuf)
     const dateMap = staryKrdBuf ? buildDateLookup(staryKrdBuf) : new Map<string, string>()
 
+    const producerSet = fakturowanieBuf ? buildProducerSet(fakturowanieBuf) : new Set<string>()
+
     const today = new Date()
     let dataRows = buildCsvRows(dluznicyBuf, addressMap, dateMap, today)
+    if (producerSet.size > 0) {
+      dataRows = dataRows.filter((row) => !producerSet.has(row.split(';')[4]))
+    }
     dataRows = filterByMinDebt(dataRows)
 
     const csvContent = [HEADER, ...dataRows].join('\n')
